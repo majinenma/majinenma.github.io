@@ -1496,13 +1496,16 @@ safe-buffer/index.js:
   /* An ad after every round, in every mode. Without an ad account set up (this Claude page, or a website
      before AdSense is approved) a 10-second ad placeholder is shown instead, so the flow can be seen. */
   var AD_REWARD = 100, AD_SECS = 10;
+  // The placeholder ad only appears in the Claude preview (no site config) or when CFG.adsPreview is on.
+  function adsPreview() { return !window.LCS_CONFIG || !!CFG.adsPreview; }
+  function adsAvailable() { return !has('no_ads') && (!!CFG.adsClient || adsPreview()); }
   function roundAd() {
     if (has('no_ads') || ui.ad) return;
     if (CFG.adsClient && window.adBreak && window.adsbygoogle && window.adsbygoogle.loaded) {
       try { window.adBreak({ type: 'next', name: 'round-end', beforeAd: function () { ui.adPause = true; musicSync(); }, afterAd: function () { ui.adPause = false; musicSync(); } }); } catch (e) {}
       return;
     }
-    fakeAd(false);
+    if (adsPreview()) fakeAd(false);
   }
   function fakeAd(reward) {
     ui.ad = { until: Date.now() + AD_SECS * 1000, reward: reward }; ui.adPause = true; musicSync(); render();
@@ -1530,7 +1533,7 @@ safe-buffer/index.js:
       } catch (e) { toast('No ad is available right now.'); }
       return;
     }
-    fakeAd(true);
+    if (adsPreview()) fakeAd(true); else toast('No ads are available right now.');
   }
   function adView() {
     if (!ui.ad) return '';
@@ -1732,7 +1735,7 @@ safe-buffer/index.js:
       '<h3>Player</h3><div class="namerow">' + chButton(myLook(), 'me', 'Your character') + '<div class="field grow"><label for="sname">Your name</label><input type="text" id="sname" maxlength="20" autocomplete="off" value="' + esc(ui.name) + '"></div></div>' +
       '<h3>Owned items</h3>' + ownedView() +
       '<h3>Account</h3>' + who +
-      '<h3>Credits</h3><p>' + coin(acct.credits) + '</p><p class="small muted">Credits are free play-money. You get ' + fmt(START_CREDITS) + ' once when you start, 10 for every 5 minutes the game is open, and ' + fmt(AD_REWARD) + ' for each ad you choose to watch. They cannot be sold or cashed out.</p><button class="btn small" data-act="adreward">Watch an ad for ' + fmt(AD_REWARD) + ' credits</button>' +
+      '<h3>Credits</h3><p>' + coin(acct.credits) + '</p><p class="small muted">Credits are free play-money. You get ' + fmt(START_CREDITS) + ' once when you start, 10 for every 5 minutes the game is open, and ' + fmt(AD_REWARD) + ' for each ad you choose to watch. They cannot be sold or cashed out.</p>' + (adsAvailable() ? '<button class="btn small" data-act="adreward">Watch an ad for ' + fmt(AD_REWARD) + ' credits</button>' : '') +
       (window.LCS_CONFIG ? '<p class="small"><a href="privacy.html" style="color:var(--accent)">Privacy policy</a></p>' : '') + '</div></div>';
   }
 
@@ -2391,7 +2394,7 @@ safe-buffer/index.js:
       tile('nav', 'room', 't2', 'WITH FRIENDS', 'Own phones, room code', 'PLAY') +
       tile('nav', 'local', 't3', 'PASS &amp; PLAY', 'One phone, 2 to 8 players', 'PLAY') +
       tile('rules', '', 't4', 'RULES', 'How to play', 'OPEN') +
-      '</nav><button class="refill" data-act="adreward"><span class="rft">WATCH AN AD</span><span class="rfc">Get ' + fmt(AD_REWARD) + ' free credits</span></button></div>';
+      '</nav>' + (adsAvailable() ? '<button class="refill" data-act="adreward"><span class="rft">WATCH AN AD</span><span class="rfc">Get ' + fmt(AD_REWARD) + ' free credits</span></button>' : '') + '</div>';
   }
 
   function lobbyView() {
