@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.lowcardshowdown.app",
+    "sha256_cert_fingerprints": ["DE:B8:7F:F2:45:91:06:9C:53:6D:89:30:6B:33:0E:7A:42:F8:5C:EB:02:26:FB:25:6D:BC:DA:DA:46:B3:CC:57"]
+  }
+}]
