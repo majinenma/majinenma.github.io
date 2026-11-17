@@ -748,6 +748,9 @@ img.pimg.m-sad{filter:grayscale(.55) brightness(.8);transform:rotate(-7deg)}
 .mysay.only{background:none;box-shadow:none;padding:0;font-size:2rem;left:2px;animation:emoj 1.2s ease-in-out infinite alternate}
 .mysay .me-emo{display:inline-block}
 @keyframes emoj{from{transform:translateY(0) scale(1)}to{transform:translateY(-6px) scale(1.12)}}
+.panel.guest{width:min(420px,92vw);align-self:center}
+.guestsheet{align-items:center}
+.panel.guest .chgrid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
 </style>
 </head>
 <body>
@@ -1725,6 +1728,16 @@ safe-buffer/index.js:
       row('Backgrounds', 'bg', BGS, function (it) { return '<span class="sw" style="background:' + it.sw + '"></span>'; }) +
       '<p class="small muted">Get more characters, card backs and table colours in the shop.</p><button class="btn small" data-act="shop">Open shop</button>';
   }
+  /* Guest start: ask for a name and a character before the menu. */
+  function guestView() {
+    var cur = myLook(), mine = CHARS.filter(function (it) { return has(it.id); });
+    return '<div class="sheet guestsheet"><div class="panel guest" role="dialog" aria-label="Your name and character"><h2>Who\'s playing?</h2>' +
+      '<div class="field"><label for="gname">Your name</label><input type="text" id="gname" maxlength="20" autocomplete="off" placeholder="Type your name" value="' + esc(ui.name) + '"></div>' +
+      '<p class="small muted">Choose your character</p><div class="chgrid">' + mine.map(function (it) {
+        return '<button class="chcell' + (it.t === cur ? ' on' : '') + '" data-act="gch" data-v="' + it.t + '" aria-pressed="' + (it.t === cur) + '"><span class="chav">' + human(it.t, 0, 0, 'hold', { bust: true }) + '</span><span>' + CHNAME[it.t] + '</span></button>';
+      }).join('') + '</div><p class="small muted">' + (CHARS.length - mine.length) + ' more characters can be unlocked in the shop.</p>' +
+      '<button class="btn primary" data-act="guestgo">Continue</button></div></div>';
+  }
   function settingsView() {
     var who;
     if (acct.mode === 'cloud') who = '<p>Signed in as <strong>' + esc(acct.user.name || 'Google account') + '</strong>. Your credits are saved to your account.</p><button class="btn" data-act="signout">Sign out</button>';
@@ -2369,7 +2382,7 @@ safe-buffer/index.js:
         '<div class="panel welcome"><h2>Welcome</h2>' +
         (acct.auth ? '<p class="small muted">Sign in to keep your credits on any phone, or play as a guest and keep them on this device.</p><button class="btn primary" data-act="signin"' + (acct.loading ? ' disabled' : '') + '>Sign in with Google</button>'
           : '<p class="small muted">' + (acct.loading ? 'Checking sign-in...' : (window.LCS_CONFIG ? 'Google sign-in is not set up for this website yet. You can play as a guest.' : 'On this Claude page your Claude account keeps your credits. Google sign-in is for the app and website.')) + '</p><button class="btn" disabled>Sign in with Google</button>') +
-        '<button class="btn' + (acct.auth ? '' : ' primary') + '" data-act="nav" data-v="menu">Play as guest</button>' +
+        '<button class="btn' + (acct.auth ? '' : ' primary') + '" data-act="guest">Play as guest</button>' +
         '<p class="small muted">Guests start with ' + fmt(START_CREDITS) + ' free credits, saved on this device. Earn more by playing and by watching ads.</p></div></div>';
     }
     var myCh = myLook();
@@ -2568,6 +2581,7 @@ safe-buffer/index.js:
     else if (ui.mode === 'online' && (!G || G.status === 'lobby')) h = G ? lobbyView() : '<div class="page"><p class="muted">' + esc(ui.note || 'Connecting...') + '</p><button class="btn" data-act="leave">Back</button></div>';
     else { var real = G; if (ui.anim) G = ui.anim.view; try { h = tableView(); } finally { G = real; } }
     if (ui.shop) h += shopView();
+    if (ui.guest) h += guestView();
     if (ui.settings) h += settingsView();
     if (ui.picker != null) h += pickerView();
     if (ui.cbuy && !ui.shop) { var pid = ui.cbuy, pr = priceOf(pid), en = acct.credits >= pr; h += '<div class="sheet confirm" data-act="cbuyno"><div class="panel" role="dialog" aria-label="Confirm purchase"><h2>Buy ' + esc(nameOf(pid)) + '?</h2><p>Price: ' + coin(pr) + '</p><p class="small muted">You have ' + fmt(acct.credits) + ' credits.' + (en ? '' : ' You need ' + fmt(pr - acct.credits) + ' more.') + '</p><div class="row"><button class="btn primary grow" data-act="cbuyyes"' + (en ? '' : ' disabled') + '>Buy</button><button class="btn grow" data-act="cbuyno">Cancel</button></div></div></div>'; }
@@ -2589,7 +2603,7 @@ safe-buffer/index.js:
   app.addEventListener('input', function (ev) {
     var t = ev.target;
     if (t.id === 'name') ui.name = t.value;
-    else if (t.id === 'sname') { ui.name = t.value; store('show-name', t.value.trim()); }
+    else if (t.id === 'sname' || t.id === 'gname') { ui.name = t.value; store('show-name', t.value.trim()); }
     else if (t.id === 'code') ui.codeInput = t.value;
     else if (t.dataset.ln) ui.localNames[+t.dataset.ln] = t.value;
   });
@@ -2613,6 +2627,9 @@ safe-buffer/index.js:
     if (a === 'decks') { ui.decks = +t.dataset.n; render(); return; }
     if (a === 'mute') { muted = !muted; store('show-mute', muted ? '1' : '0'); render(); return; }
     if (a === 'nav') { ui.home = t.dataset.v; render(); window.scrollTo(0, 0); return; }
+    if (a === 'guest') { ui.guest = true; render(); var gi = document.getElementById('gname'); if (gi && !gi.value) gi.focus(); return; }
+    if (a === 'gch') { store('show-look', t.dataset.v); render(); return; }
+    if (a === 'guestgo') { var gn = document.getElementById('gname'); if (gn) ui.name = gn.value; if (!ui.name.trim()) { toast('Type your name first.'); if (gn) gn.focus(); return; } store('show-name', ui.name.trim()); ui.guest = false; ui.home = 'menu'; render(); window.scrollTo(0, 0); return; }
     if (a === 'leave') ui.home = 'menu';
     if (a === 'emote') { ui.emoMenu = !ui.emoMenu; render(); return; }
     if (a === 'emo') { ui.emoMenu = false; render(); doEmote(t.dataset.v); return; }
