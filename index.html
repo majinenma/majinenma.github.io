@@ -751,6 +751,24 @@ img.pimg.m-sad{filter:grayscale(.55) brightness(.8);transform:rotate(-7deg)}
 .panel.guest{width:min(420px,92vw);align-self:center}
 .guestsheet{align-items:center}
 .panel.guest .chgrid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+
+/* my own seat at the bottom of the table */
+.pseat.me{cursor:pointer}
+.pseat.me .ptag{border-color:#ffd66b}
+.pseat.me .pin{border-color:#ffd66b;box-shadow:0 0 0 2px #2a1508,0 0 14px rgba(255,214,107,.6)}
+.pseat.me .etop{bottom:auto;top:-6px;left:calc(100% - 4px);transform:none}
+/* party poppers */
+.party{position:fixed;inset:0;z-index:35;pointer-events:none;overflow:hidden}
+.popper{position:absolute;bottom:22%;width:0;height:0}
+.popper.pl{left:12%}.popper.pr{right:12%}
+.popper .cone{position:absolute;left:-14px;top:-6px;width:28px;height:44px;background:linear-gradient(90deg,#ff5fa2 0 25%,#ffd66b 25% 50%,#3b82f6 50% 75%,#2fae62 75%);clip-path:polygon(50% 100%,0 0,100% 0);transform-origin:50% 100%;animation:conekick .5s ease-out both}
+.popper.pl .cone{transform:rotate(28deg)}.popper.pr .cone{transform:rotate(-28deg)}
+@keyframes conekick{0%{transform:rotate(var(--cr,0)) scale(.6)}40%{transform:rotate(var(--cr,0)) scale(1.15)}100%{transform:rotate(var(--cr,0)) scale(1)}}
+.popper.pl{--cr:28deg}.popper.pr{--cr:-28deg}
+.popper b{position:absolute;left:-4px;top:-8px;width:8px;height:8px;border-radius:2px;opacity:0;animation:burst 2.2s cubic-bezier(.15,.7,.3,1) var(--d) forwards}
+@keyframes burst{0%{opacity:1;transform:translate(0,0) rotate(0)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),calc(var(--dy) + 140px)) rotate(var(--r))}}
+.pbanner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);white-space:nowrap;font-family:var(--display);font-weight:800;font-size:clamp(1.4rem,6vw,2.2rem);color:#ffd66b;text-shadow:0 3px 0 #7a1020,0 0 24px rgba(255,214,107,.8);background:rgba(20,8,36,.75);padding:10px 22px;border-radius:999px;border:2px solid #e3b23c;animation:banner 3.4s ease-out forwards}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}20%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
 </style>
 </head>
 <body>
@@ -1834,14 +1852,31 @@ safe-buffer/index.js:
     }
   }
 
+  /* Party poppers burst from both bottom corners and a banner names the winner(s). */
+  function party(R) {
+    if (!G || !R || reduced()) return;
+    var names = R.winners.map(function (w) { return G.players[w] ? G.players[w].name : ''; }).filter(Boolean);
+    var you = R.winners.indexOf(myIndex()) >= 0 && ui.mode !== 'local';
+    var el = document.createElement('div'); el.className = 'party'; el.setAttribute('aria-hidden', 'true');
+    var cols = ['#ffd66b', '#ff5fa2', '#3b82f6', '#2fae62', '#ff8a2b', '#b48cf0', '#fff'], h = '';
+    ['l', 'r'].forEach(function (side) {
+      h += '<div class="popper p' + side + '"><i class="cone"></i>';
+      for (var q = 0; q < 26; q++) {
+        var ang = (side === 'l' ? -78 : -102) + (side === 'l' ? 1 : -1) * (Math.random() * 58), dist = 160 + Math.random() * 260, rad = ang * Math.PI / 180;
+        h += '<b style="--dx:' + Math.round(Math.cos(rad) * dist) + 'px;--dy:' + Math.round(Math.sin(rad) * dist) + 'px;--r:' + Math.round(Math.random() * 720 - 360) + 'deg;--d:' + Math.round(Math.random() * 180) + 'ms;background:' + cols[q % cols.length] + (q % 3 === 0 ? ';width:4px;height:16px' : '') + '"></b>';
+      }
+      h += '</div>';
+    });
+    h += '<div class="pbanner">🎉 ' + (you ? (names.length > 1 ? 'You share the win!' : 'You win!') : esc(names.join(' & ')) + (names.length > 1 ? ' win!' : ' wins!')) + ' 🎉</div>';
+    el.innerHTML = h; document.body.appendChild(el);
+    try { tone(180, 0, 0.09, 'sawtooth', 0.12); tone(240, 0.03, 0.08, 'square', 0.08); setTimeout(function () { tone(220, 0, 0.09, 'sawtooth', 0.12); }, 140); } catch (e) {}
+    setTimeout(function () { el.remove(); }, 3600);
+  }
   function maybeCelebrate() {
     if (!G || G.status !== 'over' || !G.result) return;
     var k = (G.code || ui.mode) + ':' + G.round; if (k === lastCele) return; lastCele = k;
     var R = G.result, me = myIndex(), iWon = R.winners.indexOf(me) >= 0;
-    if (ui.mode === 'local' || iWon) { confetti(); sfx('win'); } else sfx('lose');
-    if (ui.mode === 'local') emoPop(R.winners[0], 'cheer', 3200);
-    else if (iWon) emoPop(me, 'cheer', 3200);
-    else if (R.losers.indexOf(me) >= 0) emoPop(me, 'sad', 3200);
+    confetti(); party(R); if (ui.mode === 'local' || iWon) sfx('win'); else sfx('lose');
     setTimeout(chipsToWinners, 120);
   }
 
@@ -2473,17 +2508,19 @@ safe-buffer/index.js:
       var p = G.players[i], cnt = G.hands[i].length, timed = !over && !dealing && !A && i === G.turn;
       var em = ui.emotes[i] ? ui.emotes[i].type : (R ? (R.winners.indexOf(i) >= 0 ? 'cheer' : (R.losers.indexOf(i) >= 0 ? 'sad' : '')) : '');
       // everyone sits evenly round the table; I am at the bottom, the others go clockwise from my left
-      var ang = (90 + 360 * (idx + 1) / (K + 1)) * Math.PI / 180;
+      var mine = idx < 0, ang = (mine ? 90 : 90 + 360 * (idx + 1) / (K + 1)) * Math.PI / 180;
       var x = 50 + 45 * Math.cos(ang), y = 50 + 41 * Math.sin(ang), onL = x < 50;
-      var side = x < 40 ? 'l' : (x > 60 ? 'r' : 't');
+      var side = mine ? 'b' : (x < 40 ? 'l' : (x > 60 ? 'r' : 't'));
       var cls = 'pseat s-' + side + (!over && i === actor ? ' turn' : '') + (A && A.by === i ? ' recv' : '') + (R && R.winners.indexOf(i) >= 0 ? ' win' : '') + (em ? ' emo emo-' + em : '');
+      if (mine) cls += ' me';
       var fan = ''; if (!R) for (var q = 0; q < Math.min(cnt, 7); q++) fan += '<span class="bk" style="--q:' + (q - (Math.min(cnt, 7) - 1) / 2) + '"></span>';
       var tag = '<div class="ptag"><span class="tn">' + esc(p.name) + '</span><span class="cnt">' + (R ? 'Sum ' + R.sums[i] : cnt + (cnt === 1 ? ' card' : ' cards')) + '</span></div>';
       var pill = R ? role(i) : (p.id === G.showBy ? '<span class="pill show">Called Show</span>' : '');
       var etop = em ? '<div class="etop"><span class="bubble" aria-hidden="true">' + EMOJI[em] + '</span>' + (SAY[em] ? '<span class="say">' + SAY[em] + '</span>' : '') + '</div>' : '';
       var reveal = R ? '<div class="reveal">' + G.hands[i].map(function (cd) { return cardHtml(cd, { cls: 'xs' }); }).join('') + '</div>' : '';
       var mode = em ? (POSE[em][0] === 'sad' ? 'sad' : POSE[em][0]) : 'hold';
-      return '<div class="' + cls + '" data-p="' + i + '" style="left:clamp(' + (K >= 5 ? 38 : 44) + 'px,' + x.toFixed(1) + '%,calc(100% - ' + (!onL && y < 45 ? 84 : (K >= 5 ? 38 : 44)) + 'px));top:' + y.toFixed(1) + '%">' + etop +
+      if (mine) { fan = ''; reveal = ''; }
+      return '<div class="' + cls + '" data-p="' + i + '"' + (mine ? ' data-act="emote" role="button" aria-label="Your seat: tap for reactions"' : '') + ' style="left:clamp(' + (K >= 5 ? 38 : 44) + 'px,' + x.toFixed(1) + '%,calc(100% - ' + (!onL && y < 45 ? 84 : (K >= 5 ? 38 : 44)) + 'px));top:' + y.toFixed(1) + '%">' + etop +
         '<div class="pav">' + (timed ? RING : '') + '<div class="pin">' + human(chOf(p, i), i, 0, mode, { bust: true, face: em ? POSE[em][1] : '' }) + '</div>' + (fan ? '<div class="pfan" aria-hidden="true">' + fan + '</div>' : '') + '</div>' +
         tag + pill + reveal + '</div>';
     }
@@ -2525,7 +2562,7 @@ safe-buffer/index.js:
     var deco = over ? '' : '<i class="chips" style="left:16%;top:62%;--c:#e0453a;--d:#96251d"></i><i class="chips" style="left:21%;top:67%;--c:#3b82f6;--d:#1f4fa8"></i><i class="chips" style="right:16%;top:64%;--c:#8b5cf6;--d:#5530b8"></i>';
     var tbl = '<div class="stage n' + K + (K >= 5 ? ' many' : '') + (over ? ' over' : '') + '">' +
       '<div class="t3d ' + tstyle + '"><div class="felt"></div></div>' + deco +
-      '<div class="tcenter">' + centre + '</div>' + others.map(function (pi, idx) { return seat(pi, idx); }).join('') + '</div>';
+      '<div class="tcenter">' + centre + '</div>' + others.map(function (pi, idx) { return seat(pi, idx); }).join('') + (me >= 0 ? seat(me, -1) : '') + '</div>';
     var info = '<p class="rinfo">Round ' + G.round + (ui.mode === 'online' ? (G.pub ? ' · Table ' : ' · Room ') + esc(net.code) : '') + (G.stake ? ' · Pot ' + fmt(G.pot) : '') + (G.pub && acct.lock ? ' · Deposit ' + fmt(acct.lock.amt) : '') + '</p>';
     if (G.pub && me < 0 && G.status !== 'over') info += '<p class="last">You join at the next round' + (acct.credits < (G.tstake || G.stake) ? ' once you have ' + fmt(G.tstake || G.stake) + ' credits free. Leave to get your deposit back.' : '.') + '</p>';
     if (G.kicked && G.kicked.length && !over) { var kn = G.kicked.filter(function (id) { return !G.players.some(function (p) { return p.id === id; }); }).length; if (kn) info += '<p class="last">' + kn + (kn === 1 ? ' player was' : ' players were') + ' removed for missing 5 turns in a row.</p>'; }
@@ -2564,7 +2601,7 @@ safe-buffer/index.js:
         for (var r = 0; r < mx; r++) for (var j = 1; j <= n; j++) { var sx = (d0 + j) % n; if (r < G.hands[sx].length) { if (sx === me) myq.push(qn); qn++; } }
         dl = ' dealin';
       }
-      var mySay = ui.emotes[me] ? '<span class="mysay' + (SAY[ui.emotes[me].type] ? '' : ' only') + '"><span class="me-emo" aria-hidden="true">' + EMOJI[ui.emotes[me].type] + '</span>' + (SAY[ui.emotes[me].type] ? ' ' + SAY[ui.emotes[me].type] : '') + '</span>' : '';
+      var mySay = false && ui.emotes[me] ? '<span class="mysay' + (SAY[ui.emotes[me].type] ? '' : ' only') + '"><span class="me-emo" aria-hidden="true">' + EMOJI[ui.emotes[me].type] + '</span>' + (SAY[ui.emotes[me].type] ? ' ' + SAY[ui.emotes[me].type] : '') + '</span>' : '';
       h += '<div class="handbar' + (myTurn ? ' myturn' : '') + '"><div class="slot">' + slot + '</div>' +
         '<div class="hand' + dl + (myTurn && !G.awaitingShow ? ' live' : '') + '">' + hand.map(function (c, ci) {
           var off = ci - (hand.length - 1) / 2, dly = dl ? ((myq[ci] != null ? myq[ci] * stp : ci * 90) + 330 - el) : 0;
