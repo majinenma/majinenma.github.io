@@ -769,6 +769,10 @@ img.pimg.m-sad{filter:grayscale(.55) brightness(.8);transform:rotate(-7deg)}
 @keyframes burst{0%{opacity:1;transform:translate(0,0) rotate(0)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),calc(var(--dy) + 140px)) rotate(var(--r))}}
 .pbanner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);white-space:nowrap;font-family:var(--display);font-weight:800;font-size:clamp(1.4rem,6vw,2.2rem);color:#ffd66b;text-shadow:0 3px 0 #7a1020,0 0 24px rgba(255,214,107,.8);background:rgba(20,8,36,.75);padding:10px 22px;border-radius:999px;border:2px solid #e3b23c;animation:banner 3.4s ease-out forwards}
 @keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}20%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+
+.emenu{position:fixed;bottom:auto;z-index:50;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 12px 40px rgba(0,0,0,.7)}
+.emenu button{min-width:0}
+@media (max-width:340px){.emenu{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -2607,11 +2611,30 @@ safe-buffer/index.js:
           var off = ci - (hand.length - 1) / 2, dly = dl ? ((myq[ci] != null ? myq[ci] * stp : ci * 90) + 330 - el) : 0;
           return cardHtml(c, { style: '--rot:' + (off * 5) + 'deg;--dy:' + (Math.abs(off) * off * 0.8 + Math.abs(off) * 3) + 'px' + (dl ? ';animation-delay:' + Math.round(dly) + 'ms' : ''), act: 'sel', sel: SEL.indexOf(c) >= 0, disabled: !(myTurn && !G.awaitingShow) || !!forced });
         }).join('') + '</div>' +
-        '<div class="handhead"><span class="mewho">' + mySay + '<button class="me-av" data-act="emote" aria-label="Choose a reaction or quick chat" aria-expanded="' + !!ui.emoMenu + '" title="Tap your character for reactions and quick chat">' + (myTimed ? RING : '') + '<span class="in">' + human(chOf(G.players[me], me), me, 0, 'hold', { bust: true }) + '</span></button>' + (ui.emoMenu ? '<div class="emenu" role="menu" aria-label="Reactions">' + EMO.map(function (t) { return (t === SLEDGE[0] ? '<span class="mlab">Sledging</span>' : t === QUICK[0] ? '<span class="mlab">Quick chat</span>' : '') + '<button data-act="emo" data-v="' + t + '" role="menuitem"><span aria-hidden="true">' + EMOJI[t] + '</span>' + ELAB[t] + '</button>'; }).join('') + '</div>' : '') + '<strong>' + esc(G.players[me].name) + '</strong> <span class="muted sum">Sum ' + E.sum(hand) + '</span>' + (ui.mode === 'local' ? '' : ' ' + coin(acct.credits)) + (over ? ' ' + role(me) : '') + (myTimed ? '<span class="tw mine"><span class="tnum"></span>s</span>' : '') + '</span><span class="' + hc + '">' + hint + '</span></div></div>';
+        '<div class="handhead"><span class="mewho">' + mySay + '<button class="me-av" data-act="emote" aria-label="Choose a reaction or quick chat" aria-expanded="' + !!ui.emoMenu + '" title="Tap your character for reactions and quick chat">' + (myTimed ? RING : '') + '<span class="in">' + human(chOf(G.players[me], me), me, 0, 'hold', { bust: true }) + '</span></button>' + '' + '<strong>' + esc(G.players[me].name) + '</strong> <span class="muted sum">Sum ' + E.sum(hand) + '</span>' + (ui.mode === 'local' ? '' : ' ' + coin(acct.credits)) + (over ? ' ' + role(me) : '') + (myTimed ? '<span class="tw mine"><span class="tnum"></span>s</span>' : '') + '</span><span class="' + hc + '">' + hint + '</span></div></div>';
     } else if (over && nextBtn) h += '<div class="handbar"><div class="slot">' + nextBtn + '</div></div>';
     return h + '</div>';
   }
 
+  /* Places a floating menu next to what opened it, above or below whichever has room, and keeps it on screen. */
+  function placePopover(menu, anchor) {
+    if (!menu) return;
+    var vw = window.innerWidth, vh = window.innerHeight, m = 8;
+    menu.style.left = '0px'; menu.style.top = '0px'; menu.style.width = Math.min(300, vw - 2 * m) + 'px'; menu.style.maxHeight = 'none';
+    var r = anchor ? anchor.getBoundingClientRect() : { left: vw / 2, top: vh / 2, bottom: vh / 2, width: 0 };
+    var mh = menu.scrollHeight, mw = menu.offsetWidth, above = r.top - m - 6, below = vh - r.bottom - m - 6, top, h;
+    if (mh <= above || above >= below) { h = Math.min(mh, Math.max(140, above)); top = r.top - 6 - h; }
+    else { h = Math.min(mh, Math.max(140, below)); top = r.bottom + 6; }
+    menu.style.maxHeight = h + 'px';
+    var left = Math.max(m, Math.min(r.left + r.width / 2 - mw / 2, vw - mw - m));
+    top = Math.max(m, Math.min(top, vh - h - m));
+    menu.style.left = left + 'px'; menu.style.top = top + 'px';
+  }
+  function placeMenus() {
+    var em = app.querySelector('.emenu');
+    if (em) placePopover(em, app.querySelector('.pseat.me .pav') || app.querySelector('.me-av'));
+  }
+  window.addEventListener('resize', function () { placeMenus(); });
   function render() {
     var h;
     if (ui.screen === 'home') h = homeView();
@@ -2625,6 +2648,7 @@ safe-buffer/index.js:
     if (ui.rules) h += rulesView();
     if (ui.plus) h += '<div class="plus" aria-live="polite">+' + TRICKLE + ' credits for playing</div>';
     h += adView();
+    if (ui.emoMenu && ui.screen === 'room' && G && myIndex() >= 0) h += '<div class="emenu" role="menu" aria-label="Reactions">' + EMO.map(function (t) { return (t === SLEDGE[0] ? '<span class="mlab">Sledging</span>' : t === QUICK[0] ? '<span class="mlab">Quick chat</span>' : '') + '<button data-act="emo" data-v="' + t + '" role="menuitem"><span aria-hidden="true">' + EMOJI[t] + '</span>' + ELAB[t] + '</button>'; }).join('') + '</div>';
     if (ui.toast) h += '<div class="toast" role="alert">' + esc(ui.toast) + '</div>';
     if (ui.dwarn && ui.screen === 'room' && G && G.status === 'dealing') h += '<div class="dwarn" role="alert"><strong>Deal the cards now!</strong><span>' + (ui.mode === 'online' ? 'In ' + ui.dwarn + 's the computer deals and you are removed from the table' + (G.pub ? ' and lose your deposit' : '') + '.' : 'In ' + ui.dwarn + 's the computer deals for you.') + '</span><button class="btn primary" data-act="dealcard">Deal a card</button></div>';
     var act = document.activeElement, fid = act && act.id, pos = act && act.selectionStart;
@@ -2635,6 +2659,7 @@ safe-buffer/index.js:
     if (ui.dealFx && ui.screen === 'room' && G && G.status === 'playing') { ui.dealFx = 0; setTimeout(runDeal, 30); }
     if (ui.flyTo != null) { var ft = ui.flyTo; ui.flyTo = null; quickFly(ft); }
     if (fid) { var el = document.getElementById(fid); if (el && el.tagName === 'INPUT') { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } }
+    placeMenus();
   }
 
   app.addEventListener('input', function (ev) {
