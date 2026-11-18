@@ -1638,7 +1638,7 @@ safe-buffer/index.js:
     if (c == null) saveAcct();
   }
   function saveAcct() {
-    var rec = { credits: acct.credits, refill: acct.refill, name: (acct.user && acct.user.name) || '', lock: acct.lock || null, items: acct.items || [], stats: acct.stats || null };
+    var rec = { credits: acct.credits, refill: acct.refill, name: (acct.user && acct.user.name) || '', lock: acct.lock || null, items: acct.items || [], stats: acct.stats || null, tut: !!acct.tut || store('show-tut') === 'done' };
     if (acct.mode === 'cloud' && acct.ref) acct.ref.set(rec, { merge: true }).catch(function () {});
     else if (acct.mode === 'claude' && acct.ref) acct.ref.set(rec).catch(function () {});
     else { store('show-credits', String(acct.credits)); store('show-refill', acct.refill); store('show-items', JSON.stringify(acct.items || [])); store('show-stats', JSON.stringify(acct.stats || null)); }
@@ -1724,12 +1724,14 @@ safe-buffer/index.js:
             var snap = await acct.ref.get(), d = snap.exists ? snap.data() : null;
             acct.user = { uid: u.uid, name: u.displayName || '' }; acct.mode = 'cloud';
             acct.credits = d && typeof d.credits === 'number' ? Math.max(0, Math.floor(d.credits)) : START_CREDITS;
-            acct.refill = (d && d.refill) || today(); acct.lock = (d && d.lock) || null; acct.items = (d && d.items) || []; acct.stats = (d && d.stats) || acct.stats || null;
+            acct.refill = (d && d.refill) || today(); acct.lock = (d && d.lock) || null; acct.items = (d && d.items) || []; acct.stats = (d && d.stats) || acct.stats || null; acct.tut = !!(d && d.tut);
             if (!d) saveAcct();
           } catch (e) { acct.mode = 'guest'; acct.user = null; acct.ref = null; loadGuest(); toast('Could not load your account. Check your connection. Playing as a guest for now.'); }
         } else { acct.mode = 'guest'; acct.user = null; acct.ref = null; loadGuest(); }
         if (u && acct.mode === 'cloud' && ui.home === 'welcome') ui.home = 'menu';
-        acct.loading = false; dailyRefill(); settleOldLock(); pushMe(); render();
+        acct.loading = false; dailyRefill(); settleOldLock(); pushMe();
+        if (acct.mode === 'cloud' && ui.screen === 'home' && ui.home === 'welcome') { if (!ui.name.trim() && acct.user && acct.user.name) { ui.name = acct.user.name.split(' ')[0].slice(0, 20); store('show-name', ui.name); } ui.home = 'menu'; }
+        render();
       });
     } catch (e) { acct.loading = false; acct.auth = null; render(); }
   }
@@ -1741,7 +1743,7 @@ safe-buffer/index.js:
       var d = snap && snap.exists ? snap.data() : null;
       acct.ref = ref; acct.mode = 'claude'; acct.user = { uid: net.uid, name: '' };
       acct.credits = d && typeof d.credits === 'number' ? Math.max(0, Math.floor(d.credits)) : START_CREDITS;
-      acct.refill = (d && d.refill) || today(); acct.lock = (d && d.lock) || null; acct.items = (d && d.items) || []; acct.stats = (d && d.stats) || acct.stats || null;
+      acct.refill = (d && d.refill) || today(); acct.lock = (d && d.lock) || null; acct.items = (d && d.items) || []; acct.stats = (d && d.stats) || acct.stats || null; acct.tut = !!(d && d.tut);
       if (!d) saveAcct();
       dailyRefill(); settleOldLock(); render();
     }, function () {});
@@ -1947,7 +1949,7 @@ safe-buffer/index.js:
     var k = (G.code || ui.mode) + ':' + G.round; if (k === lastCele) return; lastCele = k;
     var R = G.result, me = myIndex(), iWon = R.winners.indexOf(me) >= 0;
     confetti(); party(R); if (ui.mode === 'local' || iWon) sfx('win'); else sfx('lose');
-    if (ui.mode === 'bot' && !tutDone()) { store('show-tut', 'done'); setTimeout(function () { toast('Tutorial complete! All game modes are unlocked.'); }, 4200); }
+    if (ui.mode === 'bot' && !tutDone()) { store('show-tut', 'done'); acct.tut = true; saveAcct(); setTimeout(function () { toast('Tutorial complete! All game modes are unlocked.'); }, 4200); }
     recordStats(R); buzz(ui.mode === 'local' || iWon ? [80, 50, 80, 50, 180] : [300]);
     setTimeout(chipsToWinners, 120);
   }
@@ -2809,7 +2811,7 @@ safe-buffer/index.js:
     var t = tutTip(); if (!t) return '';
     return '<div class="coach" role="dialog" aria-label="Tutorial tip" data-tip="' + t.id + '"><b>' + t.title + '</b><p>' + t.text + '</p><div class="row"><button class="btn small primary" data-act="tutok" data-v="' + t.id + '">Got it</button><button class="btn small" data-act="tutskip">Hide tips</button></div></div>';
   }
-  function tutDone() { return store('show-tut') === 'done'; }
+  function tutDone() { return store('show-tut') === 'done' || !!acct.tut; }
   function startTutorial() {
     if (ui.screen === 'room' && ui.mode === 'online') { toast('Leave the room first, then start the tutorial from the menu.'); return; }
     if (ui.screen === 'room') { clearTimeout(botTimer); stopAnim(); G = null; ui.mode = null; ui.screen = 'home'; ui.cover = false; ui.sel = []; ui.pick = null; }
@@ -2824,7 +2826,8 @@ safe-buffer/index.js:
   }
   window.addEventListener('resize', function () { placeMenus(); });
   function render() {
-    if (!tutDone() && !ui.tutForced && ui.screen === 'home' && ui.home === 'menu' && !ui.guest && !ui.rejoin) { ui.tutForced = true; ui.tutAsk = true; }
+    if (!tutDone() && !ui.tutForced && !acct.loading && ui.screen === 'home' && ui.home === 'menu' && !ui.guest && !ui.rejoin) { ui.tutForced = true; ui.tutAsk = true; }
+    if (ui.tutAsk && tutDone()) ui.tutAsk = false;
     var h;
     if (ui.screen === 'home') h = homeView();
     else if (ui.mode === 'online' && (!G || G.status === 'lobby')) h = G ? lobbyView() : '<div class="page"><p class="muted">' + esc(ui.note || 'Connecting...') + '</p><button class="btn" data-act="leave">Back</button></div>';
@@ -2894,7 +2897,7 @@ safe-buffer/index.js:
     if (a === 'norejoin') { dropRejoin(); return; }
     if (a === 'guest') { ui.guest = true; render(); var gi = document.getElementById('gname'); if (gi && !gi.value) gi.focus(); return; }
     if (a === 'gch') { store('show-look', t.dataset.v); render(); return; }
-    if (a === 'guestgo') { var gn = document.getElementById('gname'); if (gn) ui.name = gn.value; if (!ui.name.trim()) { toast('Type your name first.'); if (gn) gn.focus(); return; } store('show-name', ui.name.trim()); ui.guest = false; ui.home = 'menu'; ui.tutForced = true; ui.tutAsk = true; render(); window.scrollTo(0, 0); return; }
+    if (a === 'guestgo') { var gn = document.getElementById('gname'); if (gn) ui.name = gn.value; if (!ui.name.trim()) { toast('Type your name first.'); if (gn) gn.focus(); return; } store('show-name', ui.name.trim()); ui.guest = false; ui.home = 'menu'; ui.tutForced = true; ui.tutAsk = !tutDone(); render(); window.scrollTo(0, 0); return; }
     if (a === 'leave') ui.home = 'menu';
     if (a === 'emote') { ui.emoMenu = !ui.emoMenu; render(); return; }
     if (a === 'emo') { ui.emoMenu = false; render(); doEmote(t.dataset.v); return; }
