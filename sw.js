@@ -1,6 +1,6 @@
 /* Network first, so players always get the newest version of the game when they are online.
    The saved copy is only used when there is no connection (computer and pass-one-phone play still work). */
-var CACHE = 'lcs-v1', FILES = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png'];
+var CACHE = 'lcs-v2', FILES = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'tables/forest.webp', 'tables/forest_bg.webp'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', function (e) {
